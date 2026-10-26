@@ -37,7 +37,7 @@ Leave `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` empty: data goes to `./data`. `
    |---|---|
    | `APP_PASSWORD` | a long password you'll type on your phone |
    | `ANTHROPIC_API_KEY` | your Anthropic key |
-   | `KROGER_CLIENT_ID` | `freshapp-bbcf8ngl` |
+   | `KROGER_CLIENT_ID` | `pantry-pilot-bbcj78d9` |
    | `KROGER_CLIENT_SECRET` | from developer.kroger.com |
    | `KROGER_REDIRECT_URI` | `https://<your-project>.vercel.app/api/kroger/callback` |
 
