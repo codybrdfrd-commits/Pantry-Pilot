@@ -132,6 +132,11 @@ function driver(): Promise<Driver> {
       process.env.POSTGRES_URL ||
       process.env.STORAGE_URL ||
       process.env.STORAGE_POSTGRES_URL;
+    if (!url && process.env.VERCEL) {
+      return Promise.reject(
+        new Error("The database isn't connected. In Vercel, add a Neon database to this project, then redeploy."),
+      );
+    }
     globalThis.__driver = (url ? remoteDriver(url) : localDriver()).catch((err) => {
       globalThis.__driver = undefined; // retry on next request
       throw err;

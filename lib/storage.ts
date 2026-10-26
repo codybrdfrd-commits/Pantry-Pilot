@@ -3,12 +3,19 @@ import path from "node:path";
 
 /**
  * Recipe photo storage.
- * - BLOB_READ_WRITE_TOKEN set (Vercel Blob) → private blobs under recipes/<name>.
+ * - Vercel Blob connected (BLOB_READ_WRITE_TOKEN, or BLOB_STORE_ID with Vercel's OIDC token,
+ *   which the SDK picks up by itself) → private blobs under recipes/<name>.
  * - Otherwise → ./data/uploads on disk, for local dev.
  * Photos are always served through /api/images/<name>, which sits behind the app password.
  */
 
-const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const useBlob = () => {
+  if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) return true;
+  // Vercel's disk is read-only; say what's wrong instead of failing on mkdir.
+  if (process.env.VERCEL)
+    throw new Error("Photo storage isn't connected. In Vercel, add a Blob store to this project, then redeploy.");
+  return false;
+};
 const localDir = () => path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.DATA_DIR || "data", "uploads");
 const blobPath = (name: string) => `recipes/${name}`;
 
