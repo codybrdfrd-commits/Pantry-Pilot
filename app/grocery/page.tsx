@@ -12,7 +12,7 @@ const KROGER_MESSAGES: Record<string, { text: string; error?: boolean }> = {
   connected: { text: "Kroger account connected." },
   denied: { text: "Kroger sign-in was cancelled. Connect again when you're ready.", error: true },
   state: { text: "Kroger sign-in expired. Start it again from this page.", error: true },
-  error: { text: "Kroger didn't accept the sign-in. Check the client ID, secret and redirect URI in .env.", error: true },
+  error: { text: "Kroger didn't accept the sign-in. Check the Kroger client ID, secret and redirect URI in Vercel.", error: true },
 };
 
 const money = (n: number | null) => (n == null ? "" : `$${n.toFixed(2)}`);
@@ -34,9 +34,11 @@ export default function GroceryPage() {
 
   useEffect(() => {
     load();
-    const flag = new URLSearchParams(window.location.search).get("kroger");
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get("kroger");
     if (flag && KROGER_MESSAGES[flag]) {
-      setMsg(KROGER_MESSAGES[flag]);
+      const detail = params.get("detail");
+      setMsg(detail ? { ...KROGER_MESSAGES[flag], text: `Kroger didn't accept the sign-in: ${detail}` } : KROGER_MESSAGES[flag]);
       window.history.replaceState(null, "", "/grocery");
     }
   }, []);

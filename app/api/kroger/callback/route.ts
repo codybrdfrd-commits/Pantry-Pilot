@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       console.error(err);
       back.searchParams.set("kroger", "error");
+      back.searchParams.set("detail", (err as Error).message.slice(0, 300));
     }
   }
   const res = NextResponse.redirect(back);
