@@ -207,3 +207,44 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* Keyboard-only hints (⌘V, drag and drop) don't apply on touch screens */
 @media (pointer: coarse) { .desktop-only { display: none; } }
+
+/* ---------- meal plan: pick recipes ---------- */
+.week-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.week-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.week-list li {
+  display: grid; grid-template-columns: 48px 1fr auto 36px; gap: 12px; align-items: center;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.week-list li:first-child { border-top: none; }
+.week-list .thumb { width: 48px; height: 48px; border-radius: var(--radius-sm); overflow: hidden; background: var(--basil-soft); }
+.week-list .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.week-list .title { color: var(--ink); font-weight: 700; text-decoration: none; }
+.week-list .title:hover { text-decoration: underline; }
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper > span { min-width: 76px; text-align: center; }
+.stepper button {
+  width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); font: 700 1.1rem/1 var(--body); cursor: pointer;
+}
+.stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+@media (max-width: 560px) {
+  .week-list li { grid-template-columns: 48px 1fr 36px; }
+  .week-list .stepper { grid-column: 2 / 3; grid-row: 2; justify-self: start; }
+  .stepper > span { min-width: 0; text-align: left; }
+}
+
+.pick-grid { margin-top: 0; }
+.recipe-card.pick { border: none; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.recipe-card.pick .photo { position: relative; outline: 3px solid transparent; outline-offset: -3px; }
+.recipe-card.pick.on .photo { outline-color: var(--basil); }
+.recipe-card.pick .badge {
+  position: absolute; left: 8px; bottom: 8px; padding: 4px 10px; border-radius: 999px;
+  background: var(--card); color: var(--basil); font-weight: 700; font-size: 0.85rem;
+}
+.recipe-card.pick.on .badge { background: var(--basil); color: var(--card); }
+.pick-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; }
+.recipe-card.pick .photo { aspect-ratio: 4 / 3; }
+@media (max-width: 560px) {
+  .pick-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .recipe-card.pick h3 { font-size: 0.95rem; }
+}

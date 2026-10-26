@@ -1,68 +1,46 @@
 import { query, transaction } from "./db";
-import { arrangeMealPlan } from "./claude";
 import { listRecipes } from "./recipes";
 import { classifyUnit, formatAmount, itemKey, type Dimension } from "./units";
 import type { Category, GroceryItem, MealPlan, PlanEntry, ProductMatch } from "./types";
 
-export interface CreatePlanInput {
-  startDate: string;
-  days: number;
-  meals: string[];
-  servings: number;
-  notes: string;
-  /** Limit the plan to these recipes; empty means use the whole library */
-  recipeIds: number[];
+export const DEFAULT_SERVINGS = 4;
+
+/**
+ * A plan is simply "the recipes I'm making this week", each with its own servings.
+ * Entries keep day_index as their order in the list; meal is always "Meal".
+ */
+async function createEmptyPlan(): Promise<number> {
+  const [{ id }] = await query<{ id: number }>(
+    "INSERT INTO meal_plans (start_date, days, servings) VALUES ($1, 0, $2) RETURNING id",
+    [new Date().toISOString().slice(0, 10), DEFAULT_SERVINGS],
+  );
+  return id;
 }
 
-export async function createPlan(input: CreatePlanInput): Promise<number> {
-  const all = await listRecipes();
-  const pool = input.recipeIds.length ? all.filter((r) => input.recipeIds.includes(r.id)) : all;
-  if (pool.length === 0) throw new Error("Add a recipe before making a plan.");
+/** The current plan, created on first use. */
+export async function currentPlan(): Promise<MealPlan> {
+  const plan = await getPlan();
+  if (plan) return plan;
+  return (await getPlan(await createEmptyPlan()))!;
+}
 
-  let slots: { day: number; meal: string; recipe_id: number }[] = [];
-  try {
-    slots = await arrangeMealPlan({
-      days: input.days,
-      meals: input.meals,
-      notes: input.notes,
-      recipes: pool.map((r) => ({
-        id: r.id,
-        title: r.title,
-        tags: r.tags,
-        mainIngredients: r.ingredients
-          .filter((i) => ["Produce", "Meat & Seafood", "Dairy & Eggs", "Bakery"].includes(i.category))
-          .map((i) => i.name)
-          .slice(0, 10),
-      })),
-    });
-  } catch (err) {
-    console.warn("Claude planning failed, falling back to rotation:", err);
-  }
-
-  // Validate Claude's answer and fill any gaps by simple rotation.
-  const valid = new Set(pool.map((r) => r.id));
-  const grid = new Map<string, number>();
-  for (const s of slots) {
-    if (valid.has(s.recipe_id) && s.day >= 0 && s.day < input.days && input.meals.includes(s.meal))
-      grid.set(`${s.day}|${s.meal}`, s.recipe_id);
-  }
-  let rot = 0;
-  return transaction(async (q) => {
-    const [{ id: planId }] = await q<{ id: number }>(
-      "INSERT INTO meal_plans (start_date, days, servings) VALUES ($1, $2, $3) RETURNING id",
-      [input.startDate, input.days, input.servings],
-    );
-    for (let day = 0; day < input.days; day++) {
-      for (const meal of input.meals) {
-        const recipeId = grid.get(`${day}|${meal}`) ?? pool[rot++ % pool.length].id;
-        await q(
-          "INSERT INTO meal_plan_entries (plan_id, day_index, meal, recipe_id, servings) VALUES ($1, $2, $3, $4, $5)",
-          [planId, day, meal, recipeId, input.servings],
-        );
-      }
+/** Replace the plan's recipes. Keeps the plan id, so "already have it" ticks survive edits. */
+export async function setPlanItems(planId: number, items: { recipeId: number; servings: number }[]) {
+  await transaction(async (q) => {
+    await q("DELETE FROM meal_plan_entries WHERE plan_id = $1", [planId]);
+    for (let i = 0; i < items.length; i++) {
+      await q(
+        "INSERT INTO meal_plan_entries (plan_id, day_index, meal, recipe_id, servings) VALUES ($1, $2, 'Meal', $3, $4)",
+        [planId, i, items[i].recipeId, items[i].servings],
+      );
     }
-    return planId;
+    await q("UPDATE meal_plans SET days = $1 WHERE id = $2", [items.length, planId]);
   });
+}
+
+/** Start a fresh week: new empty plan, so ticks and choices start clean. */
+export async function startNewPlan(): Promise<MealPlan> {
+  return (await getPlan(await createEmptyPlan()))!;
 }
 
 export async function getPlan(id?: number): Promise<MealPlan | null> {
@@ -77,10 +55,6 @@ export async function getPlan(id?: number): Promise<MealPlan | null> {
     [plan.id],
   );
   return { ...plan, entries };
-}
-
-export async function updateEntry(entryId: number, recipeId: number | null, servings: number) {
-  await query("UPDATE meal_plan_entries SET recipe_id = $1, servings = $2 WHERE id = $3", [recipeId, servings, entryId]);
 }
 
 const CATEGORY_ORDER: Category[] = [

@@ -98,8 +98,8 @@ export default function GroceryPage() {
     return (
       <div className="page-head">
         <h1>Groceries</h1>
-        <p>Your list is built from a meal plan. Make one first.</p>
-        <p><Link className="btn btn-primary" href="/plan">Plan meals</Link></p>
+        <p>Your list is built from the recipes you pick on the Meal plan page.</p>
+        <p><Link className="btn btn-primary" href="/plan">Pick recipes</Link></p>
       </div>
     );
 
@@ -118,7 +118,7 @@ export default function GroceryPage() {
             <strong>Shopping list</strong>
             <span>{needed.length} to buy · {items.length - needed.length} at home</span>
           </header>
-          {items.length === 0 && <p>Your plan has no ingredients yet. Add recipes to its meals.</p>}
+          {items.length === 0 && <p>No recipes picked yet. Choose some on the Meal plan page.</p>}
           {items.map((item) => {
             const showAisle = item.category !== lastCategory;
             lastCategory = item.category;
