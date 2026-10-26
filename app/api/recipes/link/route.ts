@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { extractRecipeFromLink } from "@/lib/claude";
-import { readLink } from "@/lib/links";
+import { extractRecipeFromLink, fetchRecipeTextViaClaude } from "@/lib/claude";
+import { LinkError, readLink, type LinkSource } from "@/lib/links";
 import { createRecipe } from "@/lib/recipes";
 import { blobAuthFrom, saveImage } from "@/lib/storage";
 
@@ -21,10 +21,37 @@ export async function POST(req: Request) {
   const auth = blobAuthFrom(req);
   const results = await Promise.allSettled(
     urls.map(async (url) => {
-      const page = await readLink(url);
-      const recipe = await extractRecipeFromLink(page, note);
-      if (!recipe.found || recipe.ingredients.length === 0) {
-        throw new Error("No ingredient list found. If the recipe is only in the video, take a screenshot instead.");
+      let page: LinkSource | null = null;
+      try {
+        page = await readLink(url);
+      } catch (err) {
+        // Bad or private links stop here; blocked/unreachable sites get a second try below.
+        if (!(err instanceof LinkError && err.retryable)) throw err;
+      }
+      let recipe = page ? await extractRecipeFromLink(page, note) : null;
+      const isSocial = /(instagram|tiktok|youtube|youtu\.be|facebook)\./i.test(url);
+      let fallbackError: string | null = null;
+
+      // Blocked, or a JavaScript-built page with no recipe in its HTML: let Claude fetch it instead.
+      if (!recipe?.found && !isSocial) {
+        const text = await fetchRecipeTextViaClaude(url).catch((err) => {
+          console.warn("Claude web fetch failed:", url, err);
+          fallbackError = (err as Error).message;
+          return null;
+        });
+        if (text) {
+          page = { url, site: new URL(url).hostname.replace(/^www\./, ""), text, image: page?.image ?? null };
+          recipe = await extractRecipeFromLink(page, note);
+        }
+      }
+      if (!page || !recipe?.found || recipe.ingredients.length === 0) {
+        throw new Error(
+          isSocial
+            ? "No ingredient list found in the caption. If the recipe is only in the video, take a screenshot instead."
+            : fallbackError
+              ? `That site blocked the app, and fetching it through Claude failed: ${fallbackError}`
+              : "That site blocked the app or has no written recipe on the page. Take a screenshot of the recipe instead.",
+        );
       }
       const images: string[] = [];
       if (page.image) {

@@ -25,7 +25,12 @@ const MAX_PAGE = 3 * 1024 * 1024;
 const MAX_IMAGE = 5 * 1024 * 1024;
 const MAX_TEXT = 24_000;
 
-export class LinkError extends Error {}
+/** `retryable`: the site blocked or failed us, so another fetcher (Claude's web fetch) may still succeed. */
+export class LinkError extends Error {
+  constructor(message: string, readonly retryable = false) {
+    super(message);
+  }
+}
 
 function isPrivateIp(ip: string): boolean {
   if (net.isIPv4(ip)) {
@@ -213,12 +218,19 @@ export async function readLink(raw: string): Promise<LinkSource> {
     if (t?.text) return { url: url.href, site: "TikTok", text: t.text, image: t.image ?? null };
   }
 
-  const { res, url: finalUrl, body } = await fetchLimited(url.href, {
-    ua: isSocial ? PREVIEW_UA : BROWSER_UA,
-    accept: "text/html,application/xhtml+xml",
-    max: MAX_PAGE,
-  });
-  if (!res.ok) throw new LinkError(`The site answered with an error (${res.status}). Try a screenshot instead.`);
+  let fetched: Awaited<ReturnType<typeof fetchLimited>>;
+  try {
+    fetched = await fetchLimited(url.href, {
+      ua: isSocial ? PREVIEW_UA : BROWSER_UA,
+      accept: "text/html,application/xhtml+xml",
+      max: MAX_PAGE,
+    });
+  } catch (err) {
+    if (err instanceof LinkError) throw err;
+    throw new LinkError("Couldn't reach that site.", true); // timeout, connection reset, TLS…
+  }
+  const { res, url: finalUrl, body } = fetched;
+  if (!res.ok) throw new LinkError(`The site answered with an error (${res.status}).`, true);
   const html = body.toString("utf8");
   const site = meta(html, "og:site_name") ?? hostOf(finalUrl);
 
@@ -243,6 +255,6 @@ export async function readLink(raw: string): Promise<LinkSource> {
     .filter(Boolean)
     .join("\n\n")
     .slice(0, MAX_TEXT);
-  if (text.length < 40 && !image) throw new LinkError("Couldn't read anything from that page. Try a screenshot instead.");
+  if (text.length < 40 && !image) throw new LinkError("Couldn't read anything from that page.", true);
   return { url: url.href, site, text, image };
 }
