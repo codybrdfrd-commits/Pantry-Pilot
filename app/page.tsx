@@ -28,10 +28,46 @@ export default function RecipesPage() {
     return () => urls.forEach(URL.revokeObjectURL);
   }, [files]);
 
-  function addFiles(list: FileList | null) {
+  function addFiles(list: FileList | File[] | null) {
     if (!list) return;
+    const images = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    if (images.length === 0) return;
     setError(null);
-    setFiles((prev) => [...prev, ...Array.from(list).filter((f) => f.type.startsWith("image/"))].slice(0, 10));
+    setDone(null);
+    setFiles((prev) => [...prev, ...images].slice(0, 10));
+  }
+
+  // ⌘V / Ctrl+V anywhere on the page adds a copied screenshot. Text pastes are left alone.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const images = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/"));
+      if (images.length === 0) return;
+      e.preventDefault();
+      addFiles(images.map((f, i) => new File([f], `pasted-${Date.now()}-${i}.${f.type.split("/")[1] || "png"}`, { type: f.type })));
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
+  // The "Paste screenshot" button reads the clipboard directly (the browser may ask for permission).
+  async function pasteFromClipboard() {
+    try {
+      const items = await navigator.clipboard.read();
+      const images: File[] = [];
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) images.push(new File([await item.getType(type)], `pasted-${Date.now()}.png`, { type }));
+      }
+      if (images.length === 0) setError("There's no image on your clipboard. Copy a screenshot or image first, then tap Paste.");
+      else addFiles(images);
+    } catch {
+      const touch = window.matchMedia("(pointer: coarse)").matches;
+      setError(
+        touch
+          ? "Your browser didn't allow pasting. Tap Add recipe photos and pick the screenshot instead."
+          : "Your browser didn't allow reading the clipboard. Press ⌘V (Ctrl+V on Windows) on this page instead.",
+      );
+    }
   }
 
   async function submit() {
@@ -93,7 +129,8 @@ export default function RecipesPage() {
         {files.length === 0 ? (
           <div className="row" style={{ alignItems: "center" }}>
             <button className="btn btn-primary" onClick={() => input.current?.click()}>Add recipe photos</button>
-            <span className="muted small">or drop screenshots here</span>
+            <button className="btn" onClick={pasteFromClipboard}>Paste screenshot</button>
+            <span className="muted small desktop-only">or drop screenshots here, or press ⌘V</span>
           </div>
         ) : (
           <>
@@ -119,6 +156,7 @@ export default function RecipesPage() {
                   : `Read recipes from ${files.length} photo${files.length > 1 ? "s" : ""}`}
               </button>
               <button className="btn" onClick={() => input.current?.click()} disabled={busy}>Add more</button>
+              <button className="btn" onClick={pasteFromClipboard} disabled={busy}>Paste</button>
               <button className="btn btn-quiet" onClick={() => setFiles([])} disabled={busy}>Clear</button>
             </div>
           </>

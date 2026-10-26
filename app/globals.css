@@ -204,3 +204,6 @@ textarea { resize: vertical; min-height: 80px; }
 
 .topbar .nav { margin-left: auto; }
 .signout { font-size: 0.9rem; color: var(--muted); }
+
+/* Keyboard-only hints (⌘V, drag and drop) don't apply on touch screens */
+@media (pointer: coarse) { .desktop-only { display: none; } }
