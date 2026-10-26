@@ -3,7 +3,7 @@ import type { Sql, TransactionSql } from "postgres";
 
 /**
  * Postgres everywhere:
- * - DATABASE_URL (or POSTGRES_URL) set → real Postgres, e.g. Neon on Vercel (postgres.js).
+ * - DATABASE_URL (or POSTGRES_URL / STORAGE_URL from the Neon integration) set → real Postgres, e.g. Neon on Vercel (postgres.js).
  * - Not set → embedded Postgres (PGlite) stored in ./data/pg, for zero-setup local dev.
  * Queries use $1, $2 placeholders and return plain row objects.
  */
@@ -126,7 +126,12 @@ declare global {
 
 function driver(): Promise<Driver> {
   if (!globalThis.__driver) {
-    const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    // Neon's Vercel integration names this <PREFIX>_URL; accept the common prefixes.
+    const url =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.STORAGE_URL ||
+      process.env.STORAGE_POSTGRES_URL;
     globalThis.__driver = (url ? remoteDriver(url) : localDriver()).catch((err) => {
       globalThis.__driver = undefined; // retry on next request
       throw err;
