@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GroceryItem, ProductMatch } from "@/lib/types";
 
 interface KrogerStatus { configured: boolean; connected: boolean; locationId: string | null; locationName: string | null }
@@ -16,6 +16,36 @@ const KROGER_MESSAGES: Record<string, { text: string; error?: boolean }> = {
 };
 
 const money = (n: number | null) => (n == null ? "" : `$${n.toFixed(2)}`);
+
+/** Words that turn an ingredient into a different product ("avocado" → "avocado oil"). */
+const DERIVED = new Set([
+  "seasoning", "oil", "sauce", "dressing", "chips", "chip", "powder", "mix", "flavored", "flavor", "toast", "spread",
+  "dip", "broth", "stock", "soup", "juice", "extract", "candy", "snack", "snacks", "bar", "bars", "cereal", "drink",
+  "spray", "frozen", "dried", "salsa", "guacamole", "jerky", "nuggets", "patties", "baby", "food", "treat", "treats",
+]);
+
+/**
+ * Pick the most likely product for an ingredient: every ingredient word in the name, no "derived product"
+ * words the ingredient didn't ask for, in stock, short plain names, then Kroger's own ranking.
+ */
+function bestMatch(ingredient: string, products: Product[]): Product | undefined {
+  const words = ingredient.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2);
+  const asked = new Set(words);
+  const score = (p: Product, rank: number) => {
+    const nameWords = p.description.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+    const name = nameWords.join(" ");
+    const hits = words.filter((w) => name.includes(w.replace(/s$/, ""))).length;
+    const derived = nameWords.filter((w) => DERIVED.has(w) && !asked.has(w)).length;
+    return (
+      (words.length ? hits / words.length : 0) * 100 -
+      derived * 60 -
+      (p.inStock === false ? 50 : 0) -
+      nameWords.length * 1.5 -
+      rank
+    );
+  };
+  return products.map((p, i) => ({ p, s: score(p, i) })).sort((a, b) => b.s - a.s)[0]?.p;
+}
 
 export default function GroceryPage() {
   const [planId, setPlanId] = useState<number | null>(null);
@@ -69,10 +99,10 @@ export default function GroceryPage() {
     const todo = needed.filter((i) => !i.match);
     for (let n = 0; n < todo.length; n++) {
       setBusy(`Matching ${n + 1} of ${todo.length}…`);
-      const res = await fetch(`/api/kroger/products?term=${encodeURIComponent(todo[n].name)}`);
+      const res = await fetch(`/api/kroger/products?limit=15&term=${encodeURIComponent(todo[n].name)}`);
       if (!res.ok) { setMsg({ text: (await res.json()).error, error: true }); break; }
       const products: Product[] = await res.json();
-      const best = products.find((p) => p.inStock !== false) ?? products[0];
+      const best = bestMatch(todo[n].name, products);
       if (best) await saveMatch(todo[n].key, { upc: best.upc, description: best.description, size: best.size, price: best.promo ?? best.price, image: best.image, quantity: 1 });
     }
     setBusy(null);
@@ -141,9 +171,10 @@ export default function GroceryPage() {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           {item.match.image && <img src={item.match.image} alt="" />}
                           <span>{item.match.quantity} × {item.match.description} {item.match.size && `(${item.match.size})`} {money(item.match.price)}</span>
+                          <span className="change">{openKey === item.key ? "Close" : "Change"}</span>
                         </>
                       ) : (
-                        <span>Choose a Kroger product</span>
+                        <span>{openKey === item.key ? "Close" : "Choose a Kroger product"}</span>
                       )}
                     </button>
                   )}
@@ -181,43 +212,68 @@ function ProductPicker({ item, onPick }: { item: GroceryItem; onPick: (m: Produc
   const [results, setResults] = useState<Product[] | null>(null);
   const [qty, setQty] = useState(item.match?.quantity ?? 1);
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
 
   async function search(t: string) {
-    setResults(null);
+    const q = t.trim();
+    if (!q) return;
+    const seq = ++latest.current;
     setError(null);
-    const res = await fetch(`/api/kroger/products?term=${encodeURIComponent(t)}`);
+    const res = await fetch(`/api/kroger/products?limit=20&term=${encodeURIComponent(q)}`);
     const json = await res.json();
+    if (seq !== latest.current) return; // a newer search started while this one was loading
     if (res.ok) setResults(json);
     else setError(json.error);
   }
-  useEffect(() => { search(item.name); }, [item.name]);
+
+  // Search as you type, after a short pause.
+  useEffect(() => {
+    const t = setTimeout(() => search(term), term === item.name ? 0 : 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [term]);
 
   return (
     <div className="picker">
-      <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); search(term); }}>
-        <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} aria-label="Search Kroger products" style={{ flex: 1 }} />
-        <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} aria-label="Quantity" style={{ width: 70 }} />
+      <form className="picker-search" onSubmit={(e) => { e.preventDefault(); search(term); }}>
+        <label className="sr-only" htmlFor={`search-${item.key}`}>Search Kroger</label>
+        <input
+          id={`search-${item.key}`}
+          type="search"
+          value={term}
+          placeholder="Search Kroger, e.g. hass avocado"
+          onChange={(e) => setTerm(e.target.value)}
+          autoFocus
+        />
+        <button className="btn" type="submit">Search</button>
+        <label className="qty">
+          <span>Qty</span>
+          <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value)))} />
+        </label>
       </form>
       {error && <p className="small" role="alert">{error}</p>}
       {!results && !error && <p className="small">Searching…</p>}
-      {results?.length === 0 && <p className="small">No products found. Try a simpler name.</p>}
-      {results?.map((p) => (
-        <button
-          key={p.upc}
-          className="product"
-          onClick={() => onPick({ upc: p.upc, description: p.description, size: p.size, price: p.promo ?? p.price, image: p.image, quantity: qty })}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {p.image ? <img src={p.image} alt="" /> : <span />}
-          <span>
-            {p.description}
-            <span className="small" style={{ display: "block", color: "#6a6f68" }}>
-              {[p.size, p.inStock === false ? "Out of stock" : null].filter(Boolean).join(" — ")}
+      {results?.length === 0 && <p className="small">No products found. Try fewer or simpler words.</p>}
+      {results?.map((p) => {
+        const current = item.match?.upc === p.upc;
+        return (
+          <button
+            key={p.upc}
+            className={`product${current ? " current" : ""}`}
+            onClick={() => onPick({ upc: p.upc, description: p.description, size: p.size, price: p.promo ?? p.price, image: p.image, quantity: qty })}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {p.image ? <img src={p.image} alt="" /> : <span />}
+            <span>
+              {p.description}
+              <span className="small" style={{ display: "block", color: "#6a6f68" }}>
+                {[current ? "Current pick" : null, p.size, p.inStock === false ? "Out of stock" : null].filter(Boolean).join(" · ")}
+              </span>
             </span>
-          </span>
-          <span className="price">{money(p.promo ?? p.price)}</span>
-        </button>
-      ))}
+            <span className="price">{money(p.promo ?? p.price)}</span>
+          </button>
+        );
+      })}
       {item.match && <button className="btn btn-quiet" onClick={() => onPick(null)}>Remove product</button>}
     </div>
   );

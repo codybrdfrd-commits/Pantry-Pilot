@@ -5,10 +5,12 @@ import { authRow, searchProducts } from "@/lib/kroger";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const term = new URL(req.url).searchParams.get("term")?.trim();
+  const params = new URL(req.url).searchParams;
+  const term = params.get("term")?.trim();
+  const limit = Math.min(Math.max(Number(params.get("limit")) || 8, 1), 30);
   if (!term) return NextResponse.json({ error: "Missing search term." }, { status: 400 });
   try {
-    return NextResponse.json(await searchProducts(term, (await authRow()).location_id));
+    return NextResponse.json(await searchProducts(term, (await authRow()).location_id, limit));
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }

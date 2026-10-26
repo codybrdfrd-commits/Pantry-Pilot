@@ -248,3 +248,17 @@ textarea { resize: vertical; min-height: 80px; }
   .pick-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .recipe-card.pick h3 { font-size: 0.95rem; }
 }
+
+/* ---------- product picker ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.picker-search { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.picker-search input[type="search"] { min-height: 44px; }
+.picker-search .btn { min-height: 44px; background: #fff; color: #1d2420; border-color: #ddd9cb; }
+.picker-search .qty { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #6a6f68; }
+.picker-search .qty input { width: 64px; min-height: 44px; color: #1d2420; background: #fff; }
+@media (max-width: 560px) {
+  .picker-search { grid-template-columns: 1fr auto; }
+  .picker-search .qty { grid-column: 1 / -1; }
+}
+.product.current { border-color: #2f6b4f; background: #eef5f0; }
+.line-item .pick .change { margin-left: auto; text-decoration: underline; white-space: nowrap; }
