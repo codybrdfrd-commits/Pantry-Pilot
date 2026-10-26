@@ -39,6 +39,8 @@ export async function POST(req: Request) {
     images.push({ name: `${crypto.randomUUID()}.${type.ext}`, data, mediaType: type.media });
   }
 
+  // Each step is labelled so a failure says exactly where it happened.
+  let step = "reading the recipe with Claude";
   try {
     const recipe = await extractRecipeFromImages(images, note);
     if (!recipe.found || recipe.ingredients.length === 0) {
@@ -48,12 +50,14 @@ export async function POST(req: Request) {
       );
     }
     // Store photos only once we know they hold a recipe.
+    step = "saving the photo";
     const auth = blobAuthFrom(req);
     await Promise.all(images.map((img) => saveImage(img.name, img.data, img.mediaType, auth)));
+    step = "saving the recipe to the database";
     const id = await createRecipe({ ...recipe, images: images.map((i) => i.name) });
     return NextResponse.json({ id });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    console.error(`Failed while ${step}:`, err);
+    return NextResponse.json({ error: `Failed while ${step}: ${(err as Error).message}` }, { status: 500 });
   }
 }
