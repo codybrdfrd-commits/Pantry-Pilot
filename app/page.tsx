@@ -73,7 +73,7 @@ export default function RecipesPage() {
     <div className="stack">
       <div className="page-head">
         <h1>Recipes</h1>
-        <p>Screenshot recipe posts and add them here. You can add several recipes at once, and screenshots of the same post are kept together as one recipe.</p>
+        <p>Add recipe screenshots or paste links. You can add several recipes at once, and screenshots of the same post are kept together as one recipe.</p>
       </div>
 
       <div
@@ -127,6 +127,13 @@ export default function RecipesPage() {
         {done && <p className="notice" role="status">{done}</p>}
       </div>
 
+      <LinkImport
+        onAdded={async (ids, openIt) => {
+          if (openIt) return router.push(`/recipes/${ids[0]}?new=1`);
+          setRecipes(await fetch("/api/recipes").then((r) => r.json()));
+        }}
+      />
+
       {recipes && recipes.length === 0 && (
         <p className="muted">Your library is empty. Add your first recipe above to start planning meals.</p>
       )}
@@ -151,5 +158,70 @@ export default function RecipesPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+function LinkImport({ onAdded }: { onAdded: (ids: number[], openIt: boolean) => void | Promise<void> }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const urls = text.split(/\s+/).map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (urls.length === 0) return setError("Paste a link that starts with https://");
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/recipes/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const json = (await res.json()) as { ids?: number[]; failures?: { url: string; reason: string }[]; error?: string };
+      if (!res.ok || !json.ids) throw new Error(json.error || "Couldn't read those links.");
+      const failures = json.failures ?? [];
+      // Keep only the links that failed in the box, so they're easy to retry or screenshot.
+      setText(failures.map((f) => f.url).join("\n"));
+      setResult(
+        `Added ${json.ids.length} recipe${json.ids.length > 1 ? "s" : ""}.` +
+          (failures.length ? ` ${failures.length} link${failures.length > 1 ? "s" : ""} couldn't be read: ${failures[0].reason}` : ""),
+      );
+      // One clean result opens that recipe; otherwise stay here so the summary stays visible.
+      await onAdded(json.ids, json.ids.length === 1 && failures.length === 0);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="panel stack" onSubmit={submit} style={{ gap: 12 }}>
+      <label className="field">
+        <span>Or paste recipe links</span>
+        <textarea
+          rows={2}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="https://www.tiktok.com/@cook/video/…  — one per line, up to 10"
+          style={{ minHeight: 64 }}
+        />
+      </label>
+      <p className="muted small">
+        Works best with recipe websites. TikTok, YouTube and Instagram work when the recipe is written in the caption.
+      </p>
+      <div className="row">
+        <button className="btn btn-primary" type="submit" disabled={busy || urls.length === 0}>
+          {busy
+            ? "Reading links… (up to a minute)"
+            : urls.length > 1 ? `Read recipes from ${urls.length} links` : "Read recipe from link"}
+        </button>
+      </div>
+      {error && <p className="notice error" role="alert">{error}</p>}
+      {result && <p className="notice" role="status">{result}</p>}
+    </form>
   );
 }

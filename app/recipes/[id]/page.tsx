@@ -52,7 +52,17 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
           onChange={(e) => setR({ ...r, title: e.target.value })}
           style={{ font: "700 clamp(1.6rem,5vw,2.4rem)/1.1 var(--display)", border: "none", padding: 0, background: "transparent" }}
         />
-        {r.source && <p className="muted">From {r.source}</p>}
+        {r.source &&
+          (/^https?:\/\//.test(r.source) ? (
+            <p className="muted">
+              From{" "}
+              <a href={r.source} target="_blank" rel="noreferrer">
+                {new URL(r.source).hostname.replace(/^www\./, "")}
+              </a>
+            </p>
+          ) : (
+            <p className="muted">From {r.source}</p>
+          ))}
       </div>
 
       {msg && <p className={`notice${msg.error ? " error" : ""}`} role="status">{msg.text}</p>}
