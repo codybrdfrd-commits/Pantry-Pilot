@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { extractRecipeFromImages } from "@/lib/claude";
 import { createRecipe, listRecipes } from "@/lib/recipes";
-import { saveImage } from "@/lib/storage";
+import { blobAuthFrom, saveImage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -48,7 +48,8 @@ export async function POST(req: Request) {
       );
     }
     // Store photos only once we know they hold a recipe.
-    await Promise.all(images.map((img) => saveImage(img.name, img.data, img.mediaType)));
+    const auth = blobAuthFrom(req);
+    await Promise.all(images.map((img) => saveImage(img.name, img.data, img.mediaType, auth)));
     const id = await createRecipe({ ...recipe, images: images.map((i) => i.name) });
     return NextResponse.json({ id });
   } catch (err) {

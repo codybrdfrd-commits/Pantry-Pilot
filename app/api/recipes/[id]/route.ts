@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteRecipe, getRecipe, updateRecipe, type RecipeInput } from "@/lib/recipes";
-import { deleteImages } from "@/lib/storage";
+import { blobAuthFrom, deleteImages } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -20,8 +20,8 @@ export async function PUT(req: Request, { params }: Ctx) {
   return NextResponse.json(await getRecipe(id));
 }
 
-export async function DELETE(_req: Request, { params }: Ctx) {
+export async function DELETE(req: Request, { params }: Ctx) {
   const images = await deleteRecipe(Number((await params).id));
-  await deleteImages(images);
+  await deleteImages(images, blobAuthFrom(req));
   return NextResponse.json({ ok: true });
 }

@@ -19,20 +19,42 @@ const useBlob = () => {
 const localDir = () => path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.DATA_DIR || "data", "uploads");
 const blobPath = (name: string) => `recipes/${name}`;
 
-export async function saveImage(name: string, data: Buffer, contentType: string) {
+/**
+ * Credentials for Vercel Blob. With OIDC-connected stores, pass the request's
+ * x-vercel-oidc-token explicitly: if the SDK can't find it on its own it falls
+ * back to a developer-machine refresh that writes to disk and fails on Vercel.
+ */
+export type BlobAuth = { oidcToken?: string };
+export const blobAuthFrom = (req: Request): BlobAuth => ({
+  oidcToken: req.headers.get("x-vercel-oidc-token") || process.env.VERCEL_OIDC_TOKEN || undefined,
+});
+function blobOptions(auth?: BlobAuth) {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return {}; // SDK reads the token itself
+  if (!auth?.oidcToken) {
+    throw new Error(
+      "Photo storage can't sign in: Vercel didn't send its OIDC token. In Vercel, open Settings → Security and turn on OIDC Federation, then redeploy.",
+    );
+  }
+  return { oidcToken: auth.oidcToken, storeId: process.env.BLOB_STORE_ID };
+}
+
+export async function saveImage(name: string, data: Buffer, contentType: string, auth?: BlobAuth) {
   if (useBlob()) {
     const { put } = await import("@vercel/blob");
-    await put(blobPath(name), data, { access: "private", contentType, addRandomSuffix: false });
+    await put(blobPath(name), data, { access: "private", contentType, addRandomSuffix: false, ...blobOptions(auth) });
     return;
   }
   await fs.mkdir(localDir(), { recursive: true });
   await fs.writeFile(path.join(/*turbopackIgnore: true*/ localDir(), name), data);
 }
 
-export async function readImage(name: string): Promise<ReadableStream<Uint8Array> | Uint8Array | null> {
+export async function readImage(name: string, auth?: BlobAuth): Promise<ReadableStream<Uint8Array> | Uint8Array | null> {
   if (useBlob()) {
     const { get } = await import("@vercel/blob");
-    const res = await get(blobPath(name), { access: "private" }).catch(() => null);
+    const res = await get(blobPath(name), { access: "private", ...blobOptions(auth) }).catch((err) => {
+      console.warn("Blob read failed:", err);
+      return null;
+    });
     return res?.stream ?? null;
   }
   try {
@@ -42,11 +64,15 @@ export async function readImage(name: string): Promise<ReadableStream<Uint8Array
   }
 }
 
-export async function deleteImages(names: string[]) {
+export async function deleteImages(names: string[], auth?: BlobAuth) {
   if (names.length === 0) return;
   if (useBlob()) {
     const { del } = await import("@vercel/blob");
-    await del(names.map(blobPath)).catch((err) => console.warn("Blob delete failed:", err));
+    try {
+      await del(names.map(blobPath), blobOptions(auth));
+    } catch (err) {
+      console.warn("Blob delete failed:", err);
+    }
     return;
   }
   await Promise.all(names.map((n) => fs.rm(path.join(/*turbopackIgnore: true*/ localDir(), n), { force: true })));
