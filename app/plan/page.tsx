@@ -18,9 +18,12 @@ export default function PlanPage() {
     Promise.all([fetch("/api/recipes").then((r) => r.json()), fetch("/api/plan").then((r) => r.json())]).then(
       ([rs, plan]: [Recipe[], MealPlan]) => {
         setRecipes(rs);
+        // Older day-by-day plans can list a recipe several times; show each recipe once.
+        const seen = new Set<number>();
         setItems(
           plan.entries
             .filter((e) => e.recipe_id != null && rs.some((r) => r.id === e.recipe_id))
+            .filter((e) => !seen.has(e.recipe_id!) && (seen.add(e.recipe_id!), true))
             .map((e) => ({ recipeId: e.recipe_id!, servings: e.servings })),
         );
       },
