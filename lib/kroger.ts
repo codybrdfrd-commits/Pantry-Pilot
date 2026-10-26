@@ -12,9 +12,11 @@ export const USER_SCOPES = "cart.basic:write profile.compact product.compact";
 
 /** Strip whitespace and wrapping quotes that sneak in when values are pasted into a dashboard. */
 const clean = (v: string | undefined) => v?.trim().replace(/^(["'])(.*)\1$/, "$2").trim() || undefined;
+/** Client IDs are letters, digits and dashes; drop stray trailing punctuation like a typed period. */
+const cleanId = (v: string | undefined) => clean(v)?.replace(/[.,;:]+$/, "") || undefined;
 
 function creds() {
-  const id = clean(process.env.KROGER_CLIENT_ID);
+  const id = cleanId(process.env.KROGER_CLIENT_ID);
   const secret = clean(process.env.KROGER_CLIENT_SECRET);
   const redirect = clean(process.env.KROGER_REDIRECT_URI);
   if (!id || !secret || !redirect)
