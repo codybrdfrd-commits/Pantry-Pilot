@@ -14,6 +14,7 @@ export default function RecipesPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
@@ -36,6 +37,7 @@ export default function RecipesPage() {
   async function submit() {
     setBusy(true);
     setError(null);
+    setDone(null);
     try {
       const form = new FormData();
       const shrunk = await Promise.all(files.map((f) => shrinkImage(f)));
@@ -45,9 +47,22 @@ export default function RecipesPage() {
       for (const f of shrunk) form.append("images", f);
       if (note.trim()) form.append("note", note.trim());
       const res = await fetch("/api/recipes", { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Couldn't read that recipe.");
-      router.push(`/recipes/${json.id}?new=1`);
+      const json = (await res.json()) as { ids?: number[]; failed?: number; error?: string };
+      if (!res.ok || !json.ids) throw new Error(json.error || "Couldn't read that recipe.");
+      if (json.ids.length === 1 && !json.failed) {
+        router.push(`/recipes/${json.ids[0]}?new=1`);
+        return;
+      }
+      // Several recipes: stay on the library and show them.
+      setRecipes(await fetch("/api/recipes").then((r) => r.json()));
+      setFiles([]);
+      setNote("");
+      setBusy(false);
+      setDone(
+        `Added ${json.ids.length} recipe${json.ids.length > 1 ? "s" : ""}.` +
+          (json.failed ? ` ${json.failed} couldn't be read — try those photos again on their own.` : "") +
+          " Open each one to check the ingredients.",
+      );
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -58,7 +73,7 @@ export default function RecipesPage() {
     <div className="stack">
       <div className="page-head">
         <h1>Recipes</h1>
-        <p>Screenshot a recipe post, add it here, and it joins your library. Several screenshots of one post work best when the ingredients span slides.</p>
+        <p>Screenshot recipe posts and add them here. You can add several recipes at once, and screenshots of the same post are kept together as one recipe.</p>
       </div>
 
       <div
@@ -99,7 +114,9 @@ export default function RecipesPage() {
             </label>
             <div className="row">
               <button className="btn btn-primary" onClick={submit} disabled={busy}>
-                {busy ? "Reading recipe…" : `Read recipe from ${files.length} photo${files.length > 1 ? "s" : ""}`}
+                {busy
+                  ? files.length > 1 ? "Reading recipes… (up to a minute)" : "Reading recipe…"
+                  : `Read recipes from ${files.length} photo${files.length > 1 ? "s" : ""}`}
               </button>
               <button className="btn" onClick={() => input.current?.click()} disabled={busy}>Add more</button>
               <button className="btn btn-quiet" onClick={() => setFiles([])} disabled={busy}>Clear</button>
@@ -107,6 +124,7 @@ export default function RecipesPage() {
           </>
         )}
         {error && <p className="notice error" role="alert">{error}</p>}
+        {done && <p className="notice" role="status">{done}</p>}
       </div>
 
       {recipes && recipes.length === 0 && (

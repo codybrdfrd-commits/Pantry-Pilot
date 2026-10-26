@@ -112,6 +112,59 @@ export async function extractRecipeFromImages(
   return out;
 }
 
+/**
+ * Sort uploaded photos into recipes: screenshots of one post (carousel slides, caption + ingredient card)
+ * stay together, different dishes are split. Photos with no recipe are left out.
+ * Returns groups of 0-based image indexes.
+ */
+export async function groupRecipeImages(images: { data: Buffer; mediaType: ImageMedia }[]): Promise<number[][]> {
+  if (images.length === 1) return [[0]];
+  const content: Anthropic.ContentBlockParam[] = [];
+  images.forEach((img, i) => {
+    content.push({ type: "text", text: `Image ${i}:` });
+    content.push({ type: "image", source: { type: "base64", media_type: img.mediaType, data: img.data.toString("base64") } });
+  });
+  content.push({
+    type: "text",
+    text:
+      `Group these ${images.length} images by recipe. Images showing the same dish from the same post ` +
+      "(e.g. a photo plus its ingredient list, or consecutive slides) belong in one group; different dishes " +
+      "go in separate groups. Use each image index at most once. Leave out images that contain no recipe.",
+  });
+  const out = await callJson<{ groups: { image_indexes: number[]; dish: string }[] }>({
+    system: "You sort screenshots of social media recipe posts into individual recipes.",
+    content,
+    maxTokens: 2000,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        groups: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              dish: { type: "string", description: "Short name of the dish, for reference." },
+              image_indexes: { type: "array", items: { type: "integer" } },
+            },
+            required: ["dish", "image_indexes"],
+          },
+        },
+      },
+      required: ["groups"],
+    },
+  });
+  // Keep valid, unique indexes only.
+  const used = new Set<number>();
+  return out.groups
+    .map((g) =>
+      [...new Set(g.image_indexes)].filter((i) => Number.isInteger(i) && i >= 0 && i < images.length && !used.has(i) && (used.add(i), true)),
+    )
+    .filter((g) => g.length > 0)
+    .map((g) => g.sort((a, b) => a - b));
+}
+
 export interface PlanRequest {
   days: number;
   meals: string[];

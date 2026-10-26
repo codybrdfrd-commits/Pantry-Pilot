@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { extractRecipeFromImages } from "@/lib/claude";
+import { extractRecipeFromImages, groupRecipeImages } from "@/lib/claude";
 import { createRecipe, listRecipes } from "@/lib/recipes";
 import { blobAuthFrom, saveImage } from "@/lib/storage";
 
@@ -20,7 +20,11 @@ export async function GET() {
   return NextResponse.json(await listRecipes());
 }
 
-/** multipart/form-data: one or more `images` (screenshots of a single recipe) + optional `note` */
+/**
+ * multipart/form-data: 1-10 `images` + optional `note`.
+ * Photos can be several recipes at once: Claude sorts them into recipes, then each recipe is read
+ * in parallel and saved with only its own photos. Returns { ids, failed }.
+ */
 export async function POST(req: Request) {
   const form = await req.formData();
   const files = form.getAll("images").filter((f): f is File => f instanceof File);
@@ -40,22 +44,43 @@ export async function POST(req: Request) {
   }
 
   // Each step is labelled so a failure says exactly where it happened.
-  let step = "reading the recipe with Claude";
+  let step = "sorting the photos into recipes";
   try {
-    const recipe = await extractRecipeFromImages(images, note);
-    if (!recipe.found || recipe.ingredients.length === 0) {
+    let groups: number[][];
+    try {
+      groups = await groupRecipeImages(images);
+    } catch (err) {
+      console.warn("Grouping failed, treating the upload as one recipe:", err);
+      groups = [images.map((_, i) => i)];
+    }
+    if (groups.length === 0) {
       return NextResponse.json(
         { error: "No recipe found in those photos. Include the ingredient list or caption in a screenshot." },
         { status: 422 },
       );
     }
-    // Store photos only once we know they hold a recipe.
-    step = "saving the photo";
+
+    step = "reading the recipes with Claude";
     const auth = blobAuthFrom(req);
-    await Promise.all(images.map((img) => saveImage(img.name, img.data, img.mediaType, auth)));
-    step = "saving the recipe to the database";
-    const id = await createRecipe({ ...recipe, images: images.map((i) => i.name) });
-    return NextResponse.json({ id });
+    const results = await Promise.allSettled(
+      groups.map(async (group) => {
+        const groupImages = group.map((i) => images[i]);
+        const recipe = await extractRecipeFromImages(groupImages, note);
+        if (!recipe.found || recipe.ingredients.length === 0) return null;
+        // Store photos only once we know they hold a recipe.
+        await Promise.all(groupImages.map((img) => saveImage(img.name, img.data, img.mediaType, auth)));
+        return createRecipe({ ...recipe, images: groupImages.map((i) => i.name) });
+      }),
+    );
+
+    const ids = results.flatMap((r) => (r.status === "fulfilled" && r.value != null ? [r.value] : []));
+    const errors = results.flatMap((r) => (r.status === "rejected" ? [(r.reason as Error).message] : []));
+    errors.forEach((e) => console.error("Recipe failed:", e));
+    if (ids.length === 0) {
+      const error = errors[0] ? `Failed while ${step}: ${errors[0]}` : "No recipe found in those photos. Include the ingredient list or caption in a screenshot.";
+      return NextResponse.json({ error }, { status: errors[0] ? 500 : 422 });
+    }
+    return NextResponse.json({ ids, failed: groups.length - ids.length });
   } catch (err) {
     console.error(`Failed while ${step}:`, err);
     return NextResponse.json({ error: `Failed while ${step}: ${(err as Error).message}` }, { status: 500 });
