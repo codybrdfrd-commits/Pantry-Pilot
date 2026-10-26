@@ -10,10 +10,13 @@ import { query } from "./db";
 const BASE = "https://api.kroger.com/v1";
 export const USER_SCOPES = "cart.basic:write profile.compact product.compact";
 
+/** Strip whitespace and wrapping quotes that sneak in when values are pasted into a dashboard. */
+const clean = (v: string | undefined) => v?.trim().replace(/^(["'])(.*)\1$/, "$2").trim() || undefined;
+
 function creds() {
-  const id = process.env.KROGER_CLIENT_ID;
-  const secret = process.env.KROGER_CLIENT_SECRET;
-  const redirect = process.env.KROGER_REDIRECT_URI;
+  const id = clean(process.env.KROGER_CLIENT_ID);
+  const secret = clean(process.env.KROGER_CLIENT_SECRET);
+  const redirect = clean(process.env.KROGER_REDIRECT_URI);
   if (!id || !secret || !redirect)
     throw new Error("Set KROGER_CLIENT_ID, KROGER_CLIENT_SECRET and KROGER_REDIRECT_URI in .env");
   return { id, secret, redirect };
@@ -29,6 +32,12 @@ async function tokenRequest(body: Record<string, string>) {
     },
     body: new URLSearchParams(body),
   });
+  if (res.status === 401) {
+    throw new Error(
+      `Kroger rejected the app's credentials. In Vercel, check that KROGER_CLIENT_ID is ${id} and ` +
+        "KROGER_CLIENT_SECRET is the secret from that same Kroger app, then redeploy.",
+    );
+  }
   if (!res.ok) throw new Error(`Kroger token request failed (${res.status}): ${await res.text()}`);
   return (await res.json()) as { access_token: string; refresh_token?: string; expires_in: number };
 }

@@ -18,6 +18,12 @@ export async function GET(req: Request) {
     },
     password: Boolean(env.APP_PASSWORD),
     anthropic: Boolean(env.ANTHROPIC_API_KEY),
-    kroger: Boolean(env.KROGER_CLIENT_ID && env.KROGER_CLIENT_SECRET && env.KROGER_REDIRECT_URI),
+    kroger: {
+      // The client ID is public (it appears in every Kroger sign-in link); the secret is only reported as set or not.
+      clientId: env.KROGER_CLIENT_ID?.trim() ?? null,
+      secretSet: Boolean(env.KROGER_CLIENT_SECRET?.trim()),
+      secretHasSpaces: env.KROGER_CLIENT_SECRET ? env.KROGER_CLIENT_SECRET !== env.KROGER_CLIENT_SECRET.trim() : false,
+      redirectUri: env.KROGER_REDIRECT_URI?.trim() ?? null,
+    },
   });
 }
