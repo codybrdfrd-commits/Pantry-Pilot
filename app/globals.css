@@ -262,3 +262,39 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .product.current { border-color: #2f6b4f; background: #eef5f0; }
 .line-item .pick .change { margin-left: auto; text-decoration: underline; white-space: nowrap; }
+
+/* ---------- cook from receipt ---------- */
+.pantry-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pantry-chips li {
+  display: inline-flex; align-items: center; gap: 2px; padding: 4px 4px 4px 12px; border-radius: 999px;
+  background: var(--basil-soft); color: var(--ink); font-size: 0.95rem;
+}
+.pantry-chips button {
+  border: none; background: transparent; color: var(--muted); width: 28px; height: 28px; border-radius: 999px;
+  font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.pantry-chips button:hover { color: var(--tomato); background: var(--card); }
+.add-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; max-width: 480px; }
+
+.match-list { list-style: none; margin: 0; padding: 4px 20px; display: grid; }
+.match-list li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.match-list li:first-child { border-top: none; }
+.match-list .thumb { width: 48px; height: 48px; border-radius: var(--radius-sm); overflow: hidden; background: var(--basil-soft); }
+.match-list .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.match-list .title { color: var(--ink); font-weight: 700; text-decoration: none; }
+.match-list .title:hover { text-decoration: underline; }
+@media (max-width: 560px) {
+  .match-list li { grid-template-columns: 48px 1fr; }
+  .match-list li > .btn { grid-column: 2; justify-self: start; }
+}
+
+.idea-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.idea { display: grid; gap: 10px; align-content: start; }
+.ing-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ing-chips li { font-size: 0.85rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.ing-chips li.have { border-color: transparent; background: var(--basil-soft); color: var(--basil); font-weight: 700; }
+.idea details summary { cursor: pointer; font-weight: 700; }
+.idea ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+
+/* Four tabs on the phone bar */
+@media (max-width: 640px) { .nav a { padding: 8px 4px; font-size: 0.92rem; } }

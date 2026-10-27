@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CATEGORIES, type Ingredient } from "./types";
+import { CATEGORIES, type Category, type Ingredient } from "./types";
 import type { RecipeInput } from "./recipes";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -245,4 +245,124 @@ export async function groupRecipeImages(images: { data: Buffer; mediaType: Image
     )
     .filter((g) => g.length > 0)
     .map((g) => g.sort((a, b) => a - b));
+}
+
+// ---------------------------------------------------------------------------
+// Receipts
+// ---------------------------------------------------------------------------
+
+const ingredientSchema = (RECIPE_SCHEMA.properties.ingredients as { items: Record<string, unknown> }).items;
+
+/** Read grocery receipt photos (one long receipt may span several) into plain ingredient names. */
+export async function readReceipt(
+  images: { data: Buffer; mediaType: ImageMedia }[],
+): Promise<{ is_receipt: boolean; store: string | null; items: { name: string; category: Category }[] }> {
+  const content: Anthropic.ContentBlockParam[] = images.map((img) => ({
+    type: "image",
+    source: { type: "base64", media_type: img.mediaType, data: img.data.toString("base64") },
+  }));
+  content.push({
+    type: "text",
+    text:
+      `${images.length > 1 ? "These images are parts of a grocery receipt" : "This is a grocery receipt"}. ` +
+      "List the food and drink items bought. Expand store abbreviations into the plain ingredient name a recipe " +
+      "would use, lowercase and singular (e.g. 'KRO GRND BF 80/20' → 'ground beef', 'HASS AVOC' → 'avocado', " +
+      "'SS CHKN BRST' → 'chicken breast'). Drop brands, sizes and prices. Skip non-food items, tax, discounts, " +
+      "coupons, bag fees and totals. List each ingredient once. If an abbreviation can't be decoded with " +
+      "reasonable confidence, leave it out. If the image isn't a receipt, set is_receipt to false.",
+  });
+  const out = await callJson<{ is_receipt: boolean; store: string | null; items: { name: string; category: Category }[] }>({
+    system: "You read grocery store receipts and turn them into a clean list of ingredients for meal planning.",
+    content,
+    maxTokens: 4000,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        is_receipt: { type: "boolean" },
+        store: { ...nullable("string"), description: "Store name if printed." },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              name: { type: "string" },
+              category: { type: "string", enum: CATEGORIES },
+            },
+            required: ["name", "category"],
+          },
+        },
+      },
+      required: ["is_receipt", "store", "items"],
+    },
+  });
+  out.items = (out.items ?? []).map((i) => ({
+    name: i.name.trim().toLowerCase(),
+    category: (CATEGORIES as readonly string[]).includes(i.category) ? i.category : "Other",
+  }));
+  return out;
+}
+
+export interface RecipeIdea extends RecipeInput {
+  why: string;
+}
+
+/** Suggest new recipes that use mostly what's on hand. */
+export async function suggestRecipes(
+  onHand: string[],
+  existingTitles: string[],
+  count = 4,
+): Promise<RecipeIdea[]> {
+  const out = await callJson<{ ideas: RecipeIdea[] }>({
+    system:
+      "You are a practical home cook. Suggest realistic weeknight-friendly recipes that use up the groceries " +
+      "someone just bought. Amounts must be real and sensible for the servings.",
+    content: [
+      {
+        type: "text",
+        text:
+          `Groceries on hand: ${onHand.join(", ")}.\n` +
+          `Suggest ${count} varied recipes (different cuisines and proteins where possible) for 4 servings each. ` +
+          "Build each mostly from the groceries on hand. Assume common staples are available (salt, pepper, oil, " +
+          "butter, flour, sugar, garlic, basic dried spices). Each recipe may need at most 3 other ingredients. " +
+          "Use the same ingredient names as the grocery list where they match. " +
+          (existingTitles.length ? `Don't repeat these recipes they already have: ${existingTitles.join("; ")}. ` : "") +
+          "In why, say in one short sentence which groceries it uses up.",
+      },
+    ],
+    maxTokens: 12000,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        ideas: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              title: { type: "string" },
+              why: { type: "string" },
+              servings: { type: "integer" },
+              prep_minutes: { ...nullable("integer") },
+              tags: { type: "array", items: { type: "string" } },
+              ingredients: { type: "array", items: ingredientSchema },
+              steps: { type: "array", items: { type: "string" } },
+            },
+            required: ["title", "why", "servings", "prep_minutes", "tags", "ingredients", "steps"],
+          },
+        },
+      },
+      required: ["ideas"],
+    },
+  });
+  return (out.ideas ?? []).map((idea) => ({
+    ...idea,
+    source: "Suggested from your receipt",
+    ingredients: idea.ingredients.map((i: Ingredient) => ({
+      ...i,
+      category: (CATEGORIES as readonly string[]).includes(i.category) ? i.category : "Other",
+    })),
+  }));
 }

@@ -20,6 +20,12 @@ export interface Ingredient {
   category: Category;
 }
 
+/** Something you have on hand, read from a receipt or typed in. */
+export interface PantryItem {
+  name: string;
+  category: Category;
+}
+
 export interface Recipe {
   id: number;
   title: string;

@@ -10,9 +10,9 @@ export async function GET(req: Request) {
   return NextResponse.json({ planId: plan.id, items: await buildGroceryList(plan.id) });
 }
 
-/** Mark an item as already at home (excluded from the cart) */
+/** Mark items as already at home (excluded from the cart): { planId, key | keys, have } */
 export async function PATCH(req: Request) {
-  const { planId, key, have } = (await req.json()) as { planId: number; key: string; have: boolean };
-  await setHave(planId, key, have);
+  const { planId, key, keys, have } = (await req.json()) as { planId: number; key?: string; keys?: string[]; have: boolean };
+  for (const k of [...(keys ?? []), ...(key ? [key] : [])].slice(0, 200)) await setHave(planId, k, have);
   return NextResponse.json({ ok: true });
 }

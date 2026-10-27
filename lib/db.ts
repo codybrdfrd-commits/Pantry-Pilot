@@ -80,6 +80,13 @@ const SCHEMA = `
     location_name TEXT
   );
   INSERT INTO kroger_auth (id) VALUES (1) ON CONFLICT DO NOTHING;
+  -- What you have on hand, from scanned receipts (single user: one row)
+  CREATE TABLE IF NOT EXISTS pantry (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    items TEXT NOT NULL DEFAULT '[]',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  INSERT INTO pantry (id) VALUES (1) ON CONFLICT DO NOTHING;
 `;
 
 async function remoteDriver(url: string): Promise<Driver> {

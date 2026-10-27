@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "Recipes" },
   { href: "/plan", label: "Meal plan" },
   { href: "/grocery", label: "Groceries" },
+  { href: "/cook", label: "Cook" },
 ];
 
 export default function Nav() {
