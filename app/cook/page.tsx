@@ -122,6 +122,12 @@ export default function CookPage() {
     return () => window.removeEventListener("paste", onPaste);
   });
 
+  /** Run the bundled sample receipt through the real reader, so you can see how it works. */
+  async function trySample() {
+    const blob = await fetch("/sample-receipt.png").then((r) => r.blob());
+    scan([new File([blob], "sample-receipt.png", { type: "image/png" })]);
+  }
+
   async function pasteFromClipboard() {
     try {
       const files: File[] = [];
@@ -232,7 +238,11 @@ export default function CookPage() {
         </div>
 
         {pantry.length === 0 && !reading && (
-          <p className="muted">Take a photo of the whole receipt. A long receipt can be up to 4 photos.</p>
+          <p className="muted">
+            Take a photo of the whole receipt. A long receipt can be up to 4 photos.{" "}
+            <button className="link-btn" onClick={trySample}>Try a sample receipt</button>
+            {" "}(<a href="/sample-receipt.png" target="_blank" rel="noreferrer">see it</a>)
+          </p>
         )}
 
         {pantry.length > 0 && (

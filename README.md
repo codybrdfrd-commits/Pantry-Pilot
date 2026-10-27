@@ -75,6 +75,13 @@ Tables are created automatically on the first request. There are no migrations t
 - `GET /api/kroger/products?term=` · `POST /api/kroger/products` (remember product for an item)
 - `POST /api/kroger/cart` — `{ items: [{ upc, quantity }] }` → `PUT /v1/cart/add`
 
+## Cook from your receipt
+
+The **Cook** tab reads a grocery receipt photo (or the bundled `public/sample-receipt.png` via
+*Try a sample receipt*) into plain ingredients, ranks your saved recipes by how much you can already make,
+and can suggest new recipes from what you bought. Adding a recipe to this week from there ticks the bought
+ingredients off the grocery list. Matching rules live in `lib/pantry.ts` (no AI, runs in the browser).
+
 ## Known limits / next steps
 
 - **Kroger's public Cart API only adds items.** It can't read, remove, or check out — finish on kroger.com or the Kroger app.
