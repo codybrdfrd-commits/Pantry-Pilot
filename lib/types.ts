@@ -65,6 +65,9 @@ export interface GroceryItem {
   recipes: string[];
   have: boolean;
   match: ProductMatch | null;
+  /** Trader Joe's: aisle, packages to buy and estimated price */
+  tj: { aisle: string; packages: number; size: string; unitPrice: number; total: number; staple: boolean } | null;
+  tjAisle: string;
 }
 
 export interface ProductMatch {

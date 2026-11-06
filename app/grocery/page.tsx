@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GroceryItem, ProductMatch } from "@/lib/types";
+import TraderJoesList from "./tj-list";
 
 interface KrogerStatus { configured: boolean; connected: boolean; locationId: string | null; locationName: string | null }
 interface Product { upc: string; description: string; brand: string | null; size: string | null; price: number | null; promo: number | null; image: string | null; inStock: boolean | null }
@@ -54,6 +55,18 @@ export default function GroceryPage() {
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [store, setStore] = useState<"kroger" | "tj">("kroger");
+
+  // Remember which store this browser shops at.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("pp.store") === "tj") setStore("tj");
+    } catch { /* storage unavailable */ }
+  }, []);
+  function chooseStore(next: "kroger" | "tj") {
+    setStore(next);
+    try { localStorage.setItem("pp.store", next); } catch { /* storage unavailable */ }
+  }
 
   async function load() {
     const [g, k] = await Promise.all([fetch("/api/grocery").then((r) => r.json()), fetch("/api/kroger/status").then((r) => r.json())]);
@@ -140,10 +153,22 @@ export default function GroceryPage() {
     <div className="stack">
       <div className="page-head">
         <h1>Groceries</h1>
-        <p>Everything your plan needs, combined across recipes. Tick off what you already have and it stays out of the cart.</p>
+        <p>Everything your plan needs, combined across recipes. Tick off what you already have and it stays off your list.</p>
       </div>
       {msg && <p className={`notice${msg.error ? " error" : ""}`} role="status">{msg.text}</p>}
 
+      <div className="store-switch no-print" role="tablist" aria-label="Store">
+        <button role="tab" aria-selected={store === "kroger"} className={store === "kroger" ? "on" : ""} onClick={() => chooseStore("kroger")}>
+          Kroger cart
+        </button>
+        <button role="tab" aria-selected={store === "tj"} className={store === "tj" ? "on" : ""} onClick={() => chooseStore("tj")}>
+          Trader Joe&apos;s list
+        </button>
+      </div>
+
+      {store === "tj" ? (
+        <TraderJoesList planId={planId} items={items} onToggleHave={toggleHave} />
+      ) : (
       <div className="grocery-layout">
         <div className="receipt" aria-label="Grocery list">
           <header>
@@ -203,6 +228,7 @@ export default function GroceryPage() {
           />
         </aside>
       </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { query, transaction } from "./db";
 import { listRecipes } from "./recipes";
 import { classifyUnit, formatAmount, itemKey, type Dimension } from "./units";
+import { tjAisle, tjEstimate } from "./tj";
 import type { Category, GroceryItem, MealPlan, PlanEntry, ProductMatch } from "./types";
 
 export const DEFAULT_SERVINGS = 4;
@@ -109,7 +110,11 @@ export async function buildGroceryList(planId: number): Promise<GroceryItem[]> {
     const amounts = [...acc.totals.values()].map((t) => formatAmount(t.dim, t.unit, t.base));
     if (amounts.length === 0 && acc.toTaste) amounts.push("to taste");
     const m = matches.get(key);
+    const aisle = tjAisle(acc.name, acc.category);
+    const est = tjEstimate(acc.name, acc.category, [...acc.totals.values()]);
     return {
+      tjAisle: aisle,
+      tj: est ? { aisle, ...est } : null,
       key,
       name: acc.name,
       category: acc.category,

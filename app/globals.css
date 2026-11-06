@@ -316,3 +316,23 @@ textarea { resize: vertical; min-height: 80px; }
 .fchip.on span { color: inherit; opacity: 0.8; }
 .section-group { margin-top: 12px; }
 .section-group > .library { margin-top: 0; }
+
+/* ---------- store switch & Trader Joe's list ---------- */
+.store-switch { display: inline-flex; padding: 4px; gap: 4px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); justify-self: start; }
+.store-switch button { border: none; background: transparent; padding: 10px 18px; border-radius: 999px; font: 700 0.95rem/1 var(--body); color: var(--muted); cursor: pointer; min-height: 40px; }
+.store-switch button.on { background: var(--basil); color: var(--card); }
+.tj-line .what strong { font-weight: 700; }
+.tj-line .pack { color: #6a6f68; font-size: 0.85rem; }
+.tj-line .pick { color: #6a6f68; text-decoration: underline; font-size: 0.8rem; }
+.home-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.9rem; }
+
+@media print {
+  .topbar, .no-print, .page-head p, .notice, .tj-line .pick { display: none !important; }
+  body { background: #fff; }
+  .shell { padding: 0; }
+  .grocery-layout { display: block; }
+  .receipt { filter: none; -webkit-mask: none; mask: none; animation: none; padding: 0; }
+  .line-item { break-inside: avoid; }
+}
+/* On phones, put the Trader Joe's actions (copy, print, total note) above the list */
+@media (max-width: 859px) { .grocery-layout > .side.no-print { order: -1; position: static; } }
