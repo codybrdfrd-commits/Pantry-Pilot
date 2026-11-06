@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { shrinkImage } from "@/lib/resize";
+import RecipeBrowser from "./recipe-browser";
 import type { Recipe } from "@/lib/types";
 
 export default function RecipesPage() {
@@ -177,26 +178,26 @@ export default function RecipesPage() {
       {recipes && recipes.length === 0 && (
         <p className="muted">Your library is empty. Add your first recipe above to start planning meals.</p>
       )}
-      <div className="library">
-        {recipes?.map((r) => (
-          <Link key={r.id} href={`/recipes/${r.id}`} className="recipe-card">
-            <div className="photo">
-              {r.images[0] && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/api/images/${r.images[0]}`} alt="" loading="lazy" />
-              )}
-            </div>
-            <h3>{r.title}</h3>
-            <p className="muted small">
-              Serves {r.servings}
-              {r.prep_minutes ? `, ${r.prep_minutes} min` : ""} · {r.ingredients.length} ingredients
-            </p>
-            {r.tags.length > 0 && (
-              <div className="tags">{r.tags.slice(0, 3).map((t) => <span key={t} className="tag">{t}</span>)}</div>
-            )}
-          </Link>
-        ))}
-      </div>
+      {recipes && recipes.length > 0 && (
+        <RecipeBrowser
+          recipes={recipes}
+          renderCard={(r) => (
+            <Link key={r.id} href={`/recipes/${r.id}`} className="recipe-card">
+              <div className="photo">
+                {r.images[0] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/images/${r.images[0]}`} alt="" loading="lazy" />
+                )}
+              </div>
+              <h3>{r.title}</h3>
+              <p className="muted small">
+                Serves {r.servings}
+                {r.prep_minutes ? `, ${r.prep_minutes} min` : ""} · {r.ingredients.length} ingredients
+              </p>
+            </Link>
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { MealPlan, Recipe } from "@/lib/types";
+import RecipeBrowser from "../recipe-browser";
 
 const DEFAULT_SERVINGS = 4;
 
@@ -124,9 +125,10 @@ export default function PlanPage() {
       </section>
 
       <section className="stack" aria-label="Your recipes">
-        <h2>Your recipes</h2>
-        <div className="library pick-grid">
-          {recipes.map((r) => {
+        <RecipeBrowser
+          recipes={recipes}
+          gridClass="library pick-grid"
+          renderCard={(r) => {
             const on = picked.has(r.id);
             return (
               <button key={r.id} className={`recipe-card pick${on ? " on" : ""}`} onClick={() => toggle(r.id)} aria-pressed={on}>
@@ -144,8 +146,8 @@ export default function PlanPage() {
                 </p>
               </button>
             );
-          })}
-        </div>
+          }}
+        />
       </section>
     </div>
   );

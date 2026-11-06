@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { OTHER_SECTION, SECTIONS, sectionOf, withSection } from "@/lib/sections";
 import { CATEGORIES, type Category, type Ingredient, type Recipe } from "@/lib/types";
 
 export default function RecipePage({ params }: { params: Promise<{ id: string }> }) {
@@ -91,6 +92,12 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
             value={r.prep_minutes ?? ""}
             onChange={(e) => setR({ ...r, prep_minutes: e.target.value ? Number(e.target.value) : null })}
           />
+        </label>
+        <label className="field">
+          <span>Section</span>
+          <select value={sectionOf(r)} onChange={(e) => setR({ ...r, tags: withSection(r.tags, e.target.value) })}>
+            {[OTHER_SECTION, ...SECTIONS.map((x) => x.label)].map((l) => <option key={l}>{l}</option>)}
+          </select>
         </label>
         <label className="field" style={{ flexBasis: 260 }}>
           <span>Tags</span>

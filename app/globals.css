@@ -299,3 +299,20 @@ textarea { resize: vertical; min-height: 80px; }
 /* Four tabs on the phone bar */
 @media (max-width: 640px) { .nav a { padding: 8px 4px; font-size: 0.92rem; } }
 .link-btn { border: none; background: none; padding: 0; font: inherit; color: var(--basil); text-decoration: underline; cursor: pointer; }
+
+/* ---------- recipe sections & filters ---------- */
+.browser-controls { display: grid; gap: 10px; }
+.browser-controls input[type="search"] { max-width: 480px; }
+.filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+.fchip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; min-height: 40px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  font: 700 0.92rem/1 var(--body); cursor: pointer; white-space: nowrap;
+}
+.fchip span { font-weight: 400; color: var(--muted); }
+.fchip.small { min-height: 34px; padding: 6px 12px; font-size: 0.85rem; font-weight: 400; }
+.fchip.on { background: var(--basil); border-color: var(--basil); color: var(--card); }
+.fchip.on span { color: inherit; opacity: 0.8; }
+.section-group { margin-top: 12px; }
+.section-group > .library { margin-top: 0; }
