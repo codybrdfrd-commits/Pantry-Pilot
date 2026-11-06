@@ -165,6 +165,8 @@ export default function RecipesPage() {
         {done && <p className="notice" role="status">{done}</p>}
       </div>
 
+      <FileImport onDone={async () => setRecipes(await fetch("/api/recipes").then((r) => r.json()))} />
+
       <LinkImport
         onAdded={async (ids, openIt) => {
           if (openIt) return router.push(`/recipes/${ids[0]}?new=1`);
@@ -261,5 +263,92 @@ function LinkImport({ onAdded }: { onAdded: (ids: number[], openIt: boolean) => 
       {error && <p className="notice error" role="alert">{error}</p>}
       {result && <p className="notice" role="status">{result}</p>}
     </form>
+  );
+}
+
+/**
+ * Import a recipe file (.json array of recipes, optionally with base64 photos), e.g. a whole cookbook.
+ * Recipes go up one at a time; ones already in the library (same title) are skipped.
+ */
+function FileImport({ onDone }: { onDone: () => void | Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [result, setResult] = useState<{ text: string; error?: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(file: File) {
+    setBusy(true);
+    setResult(null);
+    let list: unknown;
+    try {
+      list = JSON.parse(await file.text());
+    } catch {
+      setBusy(false);
+      return setResult({ text: "That file isn't a recipe import file.", error: true });
+    }
+    const recipes = (Array.isArray(list) ? list : (list as { recipes?: unknown[] })?.recipes) ?? [];
+    if (!Array.isArray(recipes) || recipes.length === 0) {
+      setBusy(false);
+      return setResult({ text: "No recipes found in that file.", error: true });
+    }
+    let added = 0, skipped = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < recipes.length; i++) {
+      const r = recipes[i] as { title?: string };
+      setProgress(`Importing ${i + 1} of ${recipes.length}: ${r.title ?? "untitled"}`);
+      try {
+        const res = await fetch("/api/recipes/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...r, skipIfExists: true }),
+        });
+        const json = (await res.json()) as { skipped?: boolean; error?: string };
+        if (!res.ok) throw new Error(json.error);
+        if (json.skipped) skipped++;
+        else added++;
+      } catch {
+        failed.push(r.title ?? `#${i + 1}`);
+      }
+    }
+    setProgress(null);
+    setBusy(false);
+    setResult({
+      text:
+        `Imported ${added} recipe${added === 1 ? "" : "s"}.` +
+        (skipped ? ` ${skipped} were already in your library.` : "") +
+        (failed.length ? ` ${failed.length} failed: ${failed.slice(0, 5).join(", ")}${failed.length > 5 ? "…" : ""}. Import the file again to retry them.` : ""),
+      error: failed.length > 0 && added === 0,
+    });
+    await onDone();
+  }
+
+  if (!open)
+    return (
+      <p className="muted small">
+        Have a recipe file?{" "}
+        <button className="link-btn" onClick={() => setOpen(true)}>Import recipes from a file</button>
+      </p>
+    );
+
+  return (
+    <section className="panel stack" style={{ gap: 12 }}>
+      <h2>Import recipes</h2>
+      <p className="muted small">Choose a recipe import file (.json). Recipes already in your library are skipped.</p>
+      <div className="row">
+        <label className="btn btn-primary" aria-disabled={busy}>
+          {busy ? "Importing…" : "Choose file"}
+          <input
+            type="file"
+            accept=".json,application/json"
+            hidden
+            disabled={busy}
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) run(f); }}
+          />
+        </label>
+        {!busy && <button className="btn btn-quiet" onClick={() => { setOpen(false); setResult(null); }}>Close</button>}
+      </div>
+      {progress && <p className="small" role="status">{progress}</p>}
+      {result && <p className={`notice${result.error ? " error" : ""}`} role="status">{result.text}</p>}
+    </section>
   );
 }
