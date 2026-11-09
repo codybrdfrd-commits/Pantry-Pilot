@@ -336,3 +336,20 @@ textarea { resize: vertical; min-height: 80px; }
 }
 /* On phones, put the Trader Joe's actions (copy, print, total note) above the list */
 @media (max-width: 859px) { .grocery-layout > .side.no-print { order: -1; position: static; } }
+
+/* ---------- recipe photos ---------- */
+.photo-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.photo-strip figure { margin: 0; flex: none; width: 132px; display: grid; gap: 6px; }
+.photo-strip img { width: 132px; height: 132px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--line); }
+.photo-strip figure.cover img { outline: 3px solid var(--basil); outline-offset: -3px; }
+.photo-strip figcaption { display: flex; justify-content: space-between; gap: 6px; font-size: 0.85rem; }
+.photo-strip .cover-label { color: var(--basil); font-weight: 700; font-size: 0.85rem; }
+.photo-strip .remove { color: var(--muted); }
+.add-photo {
+  flex: none; width: 132px; height: 132px; display: grid; place-content: center; justify-items: center; gap: 4px;
+  border: 2px dashed var(--line); border-radius: var(--radius); background: var(--card); color: var(--basil);
+  font-weight: 700; font-size: 0.9rem; cursor: pointer; text-align: center; padding: 8px;
+}
+.add-photo span { font-size: 1.8rem; line-height: 1; }
+.add-photo:hover { border-color: var(--basil); }
+.add-photo.busy { cursor: progress; opacity: 0.7; }

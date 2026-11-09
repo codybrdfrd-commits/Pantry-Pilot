@@ -116,3 +116,8 @@ export async function deleteRecipe(id: number): Promise<string[]> {
   const rows = await query<{ images: string }>("DELETE FROM recipes WHERE id = $1 RETURNING images", [id]);
   return rows[0] ? JSON.parse(rows[0].images) : [];
 }
+
+/** Replace a recipe's photo list (first photo is the cover). */
+export async function setRecipeImages(id: number, images: string[]): Promise<void> {
+  await query("UPDATE recipes SET images = $1 WHERE id = $2", [JSON.stringify(images), id]);
+}

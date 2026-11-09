@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { shrinkImage } from "@/lib/resize";
 import { OTHER_SECTION, SECTIONS, sectionOf, withSection } from "@/lib/sections";
 import { CATEGORIES, type Category, type Ingredient, type Recipe } from "@/lib/types";
 
@@ -68,16 +69,12 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
 
       {msg && <p className={`notice${msg.error ? " error" : ""}`} role="status">{msg.text}</p>}
 
-      {r.images.length > 0 && (
-        <div className="thumbs">
-          {r.images.map((img) => (
-            <a key={img} href={`/api/images/${img}`} target="_blank" rel="noreferrer">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/images/${img}`} alt="Original screenshot" />
-            </a>
-          ))}
-        </div>
-      )}
+      <Photos
+        recipeId={r.id}
+        title={r.title}
+        images={r.images}
+        onChange={(images) => setR((cur) => (cur ? { ...cur, images } : cur))}
+      />
 
       <div className="row">
         <label className="field">
@@ -164,5 +161,92 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
         <button className="btn btn-quiet" onClick={remove}>Delete recipe</button>
       </div>
     </div>
+  );
+}
+
+/** Recipe photos: add from camera or library, make one the cover, or remove. Changes save right away. */
+function Photos({
+  recipeId,
+  title,
+  images,
+  onChange,
+}: {
+  recipeId: number;
+  title: string;
+  images: string[];
+  onChange: (images: string[]) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function add(files: File[]) {
+    if (files.length === 0) return;
+    setBusy(files.length > 1 ? "Adding photos…" : "Adding photo…");
+    setError(null);
+    try {
+      const form = new FormData();
+      for (const f of await Promise.all(files.slice(0, 6).map((f) => shrinkImage(f)))) form.append("images", f);
+      const res = await fetch(`/api/recipes/${recipeId}/photos`, { method: "POST", body: form });
+      const json = (await res.json()) as { images?: string[]; error?: string };
+      if (!res.ok || !json.images) throw new Error(json.error || "Couldn't add that photo.");
+      onChange(json.images);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function update(next: string[]) {
+    setError(null);
+    const res = await fetch(`/api/recipes/${recipeId}/photos`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ images: next }),
+    });
+    const json = (await res.json()) as { images?: string[]; error?: string };
+    if (res.ok && json.images) onChange(json.images);
+    else setError(json.error || "Couldn't update the photos.");
+  }
+
+  return (
+    <section className="photos" aria-label="Photos">
+      <div className="photo-strip">
+        {images.map((img, i) => (
+          <figure key={img} className={i === 0 ? "cover" : ""}>
+            <a href={`/api/images/${img}`} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/images/${img}`} alt={i === 0 ? `${title} (cover photo)` : `${title}, photo ${i + 1}`} />
+            </a>
+            <figcaption>
+              {i === 0 ? (
+                <span className="cover-label">Cover</span>
+              ) : (
+                <button className="link-btn small" onClick={() => update([img, ...images.filter((x) => x !== img)])}>Make cover</button>
+              )}
+              <button
+                className="link-btn small remove"
+                onClick={() => { if (confirm("Remove this photo?")) update(images.filter((x) => x !== img)); }}
+              >
+                Remove
+              </button>
+            </figcaption>
+          </figure>
+        ))}
+        <label className={`add-photo${busy ? " busy" : ""}`}>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            disabled={!!busy}
+            onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ""; add(f); }}
+          />
+          <span aria-hidden="true">+</span>
+          {busy ?? (images.length ? "Add photo" : "Add a photo")}
+        </label>
+      </div>
+      {error && <p className="notice error" role="alert">{error}</p>}
+    </section>
   );
 }
