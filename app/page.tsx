@@ -292,7 +292,7 @@ function FileImport({ onDone }: { onDone: () => void | Promise<void> }) {
       setBusy(false);
       return setResult({ text: "No recipes found in that file.", error: true });
     }
-    let added = 0, skipped = 0;
+    let added = 0, skipped = 0, photos = 0, updated = 0;
     const failed: string[] = [];
     for (let i = 0; i < recipes.length; i++) {
       const r = recipes[i] as { title?: string };
@@ -303,9 +303,11 @@ function FileImport({ onDone }: { onDone: () => void | Promise<void> }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...r, skipIfExists: true }),
         });
-        const json = (await res.json()) as { skipped?: boolean; error?: string };
+        const json = (await res.json()) as { skipped?: boolean; updated?: boolean; photoAdded?: boolean; error?: string };
         if (!res.ok) throw new Error(json.error);
-        if (json.skipped) skipped++;
+        if (json.updated) updated++;
+        else if (json.photoAdded) photos++;
+        else if (json.skipped) skipped++;
         else added++;
       } catch {
         failed.push(r.title ?? `#${i + 1}`);
@@ -316,6 +318,8 @@ function FileImport({ onDone }: { onDone: () => void | Promise<void> }) {
     setResult({
       text:
         `Imported ${added} recipe${added === 1 ? "" : "s"}.` +
+        (updated ? ` Updated ${updated} recipe${updated === 1 ? "" : "s"} already in your library.` : "") +
+        (photos ? ` Added photos to ${photos} recipe${photos === 1 ? "" : "s"} already in your library.` : "") +
         (skipped ? ` ${skipped} were already in your library.` : "") +
         (failed.length ? ` ${failed.length} failed: ${failed.slice(0, 5).join(", ")}${failed.length > 5 ? "…" : ""}. Import the file again to retry them.` : ""),
       error: failed.length > 0 && added === 0,
@@ -334,7 +338,7 @@ function FileImport({ onDone }: { onDone: () => void | Promise<void> }) {
   return (
     <section className="panel stack" style={{ gap: 12 }}>
       <h2>Import recipes</h2>
-      <p className="muted small">Choose a recipe import file (.json). Recipes already in your library are skipped.</p>
+      <p className="muted small">Choose a recipe import file (.json). Recipes already in your library aren&apos;t duplicated.</p>
       <div className="row">
         <label className="btn btn-primary" aria-disabled={busy}>
           {busy ? "Importing…" : "Choose file"}

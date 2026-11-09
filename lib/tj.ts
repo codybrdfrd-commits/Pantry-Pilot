@@ -240,6 +240,10 @@ const EVERYDAY: Record<string, Row> = {
   "lime juice": [2.99, 1.5, "cup", 0.2], "italian dressing": [3.49, 2, "cup", 0.4], "cornstarch": [2.49, 2, "cup", 0.05],
   "italian sausage": [4.99, 16, "oz", 1], "boneless pork shoulder": [4.99, 16, "oz", 1], "orange juice": [3.99, 7, "cup", 0.1],
   "marinara sauce": [3.49, 3, "cup", 1], "diced tomatoes": [1.79, 14.5, "oz", 1], "alfredo sauce": [3.29, 2, "cup", 1],
+  "shell pasta": [1.49, 16, "oz", 0.75], "cavatappi pasta": [1.49, 16, "oz", 0.75], "bow tie pasta": [1.49, 16, "oz", 0.75],
+  "jasmine rice": [3.99, 4.5, "cup", 0.3], "yukon gold potatoes": [3.99, 48, "oz", 1], "milk": [3.99, 16, "cup", 0.1],
+  "broccolini": [2.99, 1, "pkg", 1], "shredded lettuce": [1.99, 4, "cup", 0.5], "garlic bread": [3.49, 1, "pkg", 1],
+  "fresh parsley": [1.99, 1, "pkg", 0.3],
 };
 for (const [k, v] of Object.entries(EVERYDAY)) PRICES[k] ??= v;
 
