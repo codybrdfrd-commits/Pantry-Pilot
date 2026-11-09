@@ -9,6 +9,7 @@ export const SECTIONS = [
   { tag: "30 minute meals", label: "30 Minute Meals" },
   { tag: "one pan", label: "One Pan" },
   { tag: "sheet pan", label: "Sheet Pan" },
+  { tag: "slow cooker", label: "Slow Cooker" },
 ] as const;
 export const OTHER_SECTION = "My recipes";
 export const SECTION_TAGS = new Set<string>(SECTIONS.map((s) => s.tag));

@@ -229,14 +229,42 @@ const PRICES: Record<string, Row> = {
   "zhoug sauce": [3.99, 1, "pkg", 0.3],
 };
 
+// Everyday ingredients (used by recipes outside the cookbook).
+const EVERYDAY: Record<string, Row> = {
+  "yellow onion": [0.99, 1, "ct", 1], "onion": [0.99, 1, "ct", 1], "garlic": [0.69, 10, "ct", 0.3],
+  "cream cheese": [2.29, 8, "oz", 1], "ricotta cheese": [3.49, 1.75, "cup", 0.5], "half-and-half": [2.49, 2, "cup", 0.5],
+  "shredded cheddar cheese": [3.99, 3, "cup", 0.5], "beef broth": [2.99, 4, "cup", 0.5], "lasagna noodles": [2.99, 16, "ct", 0.5],
+  "penne pasta": [1.49, 16, "oz", 0.5], "artichoke hearts": [2.79, 14, "oz", 1], "sliced mushrooms": [2.49, 8, "oz", 1],
+  "marsala wine": [6.99, 3, "cup", 0.2], "ketchup": [2.49, 2, "cup", 0.1], "brown sugar": [2.99, 4, "cup", 0.1],
+  "rice vinegar": [2.49, 1.5, "cup", 0.1], "mild salsa": [2.99, 2, "cup", 0.5], "salsa": [2.99, 2, "cup", 0.5],
+  "lime juice": [2.99, 1.5, "cup", 0.2], "italian dressing": [3.49, 2, "cup", 0.4], "cornstarch": [2.49, 2, "cup", 0.05],
+  "italian sausage": [4.99, 16, "oz", 1], "boneless pork shoulder": [4.99, 16, "oz", 1], "orange juice": [3.99, 7, "cup", 0.1],
+  "marinara sauce": [3.49, 3, "cup", 1], "diced tomatoes": [1.79, 14.5, "oz", 1], "alfredo sauce": [3.29, 2, "cup", 1],
+};
+for (const [k, v] of Object.entries(EVERYDAY)) PRICES[k] ??= v;
+
 const INDEX = new Map(Object.entries(PRICES).map(([name, row]) => [itemKey(name), { name, row }]));
+
+/** Words that make a product something other than the plain ingredient ("onion" vs "crunchy chili onion"). */
+const DERIVED = new Set([
+  "sauce", "dip", "oil", "spread", "soup", "broth", "stock", "dressing", "juice", "powder", "seasoning", "chili", "crunchy",
+  "chips", "chip", "paste", "jam", "butter", "cream", "risotto", "rice", "fried", "salsa", "pesto", "chutney", "caramelized",
+  "roasted", "smoked", "dried", "pickled", "flavored", "spicy", "sweet", "garlicky", "with", "&", "sour",
+]);
 
 function lookup(name: string) {
   const exact = INDEX.get(itemKey(name));
   if (exact) return exact;
-  // A priced product that is at least as specific as the ingredient ("boneless skinless chicken thighs" → "chicken thighs").
-  for (const [, v] of INDEX) if (covers(v.name, name)) return v;
-  return null;
+  // Otherwise a priced product that is at least as specific as the ingredient ("boneless skinless chicken thighs"
+  // for "chicken thighs"), skipping products that turn it into something else, and preferring the plainest name.
+  const asked = new Set(itemKey(name).split(/\s+/));
+  let best: { name: string; row: Row } | null = null;
+  for (const [key, v] of INDEX) {
+    if (!covers(v.name, name)) continue;
+    if (key.split(/\s+/).some((w) => DERIVED.has(w) && !asked.has(w))) continue;
+    if (!best || key.length < itemKey(best.name).length) best = v;
+  }
+  return best;
 }
 
 export const TJ_AISLES = [
@@ -304,6 +332,7 @@ export function tjEstimate(
   }
   if (!measured) share = noneShare;
   const packages = Math.max(1, Math.ceil(share - 0.08));
-  const sizeLabel = su === "oz" ? `${+size.toFixed(2)} oz` : su === "ct" && size > 1 ? `pack of ${size}` : "";
+  const sizeLabel =
+    itemKey(found.name) === "garlic" ? "head" : su === "oz" ? `${+size.toFixed(2)} oz` : su === "ct" && size > 1 ? `pack of ${size}` : "";
   return { packages, size: sizeLabel, unitPrice: price, total: Math.round(packages * price * 100) / 100, staple };
 }
