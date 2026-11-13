@@ -244,6 +244,13 @@ const EVERYDAY: Record<string, Row> = {
   "jasmine rice": [3.99, 4.5, "cup", 0.3], "yukon gold potatoes": [3.99, 48, "oz", 1], "milk": [3.99, 16, "cup", 0.1],
   "broccolini": [2.99, 1, "pkg", 1], "shredded lettuce": [1.99, 4, "cup", 0.5], "garlic bread": [3.49, 1, "pkg", 1],
   "fresh parsley": [1.99, 1, "pkg", 0.3],
+  "celery stalks": [2.49, 8, "ct", 0.5], "coleslaw mix": [1.99, 10, "oz", 1], "green onions": [1.29, 6, "ct", 0.5],
+  "orange": [0.69, 1, "ct", 1], "beef chuck roast": [7.99, 16, "oz", 1], "hamburger buns": [3.49, 8, "ct", 1],
+  "frozen broccoli": [1.99, 12, "oz", 1], "frozen corn": [1.99, 3.5, "cup", 0.5], "apple cider vinegar": [2.49, 2, "cup", 0.1],
+  "black beans": [0.99, 15, "oz", 1], "kidney beans": [0.99, 15, "oz", 1], "crushed tomatoes": [2.29, 28, "oz", 1],
+  "cream of chicken soup": [1.99, 10.5, "oz", 1], "mayonnaise": [2.99, 2, "cup", 0.1], "pepperoncini peppers": [2.99, 16, "ct", 0.5],
+  "salsa verde": [2.99, 16, "oz", 1], "wild rice blend": [3.49, 2.5, "cup", 0.4], "ranch seasoning mix": [1.99, 1, "oz", 1],
+  "au jus gravy mix": [1.49, 1, "oz", 1], "white rice": [3.99, 4.5, "cup", 0.3],
 };
 for (const [k, v] of Object.entries(EVERYDAY)) PRICES[k] ??= v;
 
