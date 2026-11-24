@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { shrinkImage } from "@/lib/resize";
+import { formatQty } from "@/lib/units";
 import { OTHER_SECTION, SECTIONS, sectionOf, withSection } from "@/lib/sections";
 import { CATEGORIES, type Category, type Ingredient, type Recipe } from "@/lib/types";
 
@@ -12,6 +13,8 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
   const isNew = useSearchParams().get("new") === "1";
   const [r, setR] = useState<Recipe | null>(null);
   const [saving, setSaving] = useState(false);
+  // New recipes open in edit mode so you can check what was read; saved ones open as a clean recipe card.
+  const [editing, setEditing] = useState(isNew);
   const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(
     isNew ? { text: "Recipe added. Check the ingredients — amounts read from photos can be off." } : null,
   );
@@ -34,7 +37,7 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
     });
     const json = await res.json();
     setSaving(false);
-    if (res.ok) { setR(json); setMsg({ text: "Changes saved." }); }
+    if (res.ok) { setR(json); setMsg({ text: "Changes saved." }); setEditing(false); }
     else setMsg({ text: json.error, error: true });
   }
 
@@ -42,6 +45,79 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
     if (!confirm(`Delete “${r!.title}”? It will also be removed from meal plans.`)) return;
     await fetch(`/api/recipes/${id}`, { method: "DELETE" });
     router.push("/");
+  }
+
+  const source = r.source &&
+    (/^https?:\/\//.test(r.source) ? (
+      <p className="muted">
+        From{" "}
+        <a href={r.source} target="_blank" rel="noreferrer">
+          {new URL(r.source).hostname.replace(/^www\./, "")}
+        </a>
+      </p>
+    ) : (
+      <p className="muted">From {r.source}</p>
+    ));
+
+  const photos = (
+    <Photos
+      recipeId={r.id}
+      title={r.title}
+      images={r.images}
+      onChange={(images) => setR((cur) => (cur ? { ...cur, images } : cur))}
+    />
+  );
+
+  if (!editing) {
+    const meta = [
+      `Serves ${r.servings}`,
+      r.prep_minutes ? `${r.prep_minutes} min prep` : null,
+      sectionOf(r) !== OTHER_SECTION ? sectionOf(r) : null,
+    ].filter(Boolean);
+    return (
+      <div className="stack recipe-view">
+        <div className="page-head">
+          <h1>{r.title}</h1>
+          <p className="recipe-meta">{meta.join(" · ")}</p>
+          {source}
+        </div>
+
+        {msg && <p className={`notice${msg.error ? " error" : ""}`} role="status">{msg.text}</p>}
+
+        {photos}
+
+        <section className="panel stack">
+          <h2>Ingredients</h2>
+          <ul className="ing-list">
+            {r.ingredients.map((ing, i) => (
+              <li key={ing.id ?? i}>
+                <span className="ing-amt">
+                  {ing.quantity != null ? formatQty(ing.quantity) : ""}
+                  {ing.unit ? ` ${plural(ing.unit, ing.quantity)}` : ""}
+                </span>
+                <span>
+                  {ing.name}
+                  {ing.note && <span className="muted">, {ing.note}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {r.steps.length > 0 && (
+          <section className="panel stack">
+            <h2>Method</h2>
+            <ol className="step-list">
+              {r.steps.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+          </section>
+        )}
+
+        <div className="row">
+          <button className="btn" onClick={() => { setMsg(null); setEditing(true); }}>Edit recipe</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -54,27 +130,12 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
           onChange={(e) => setR({ ...r, title: e.target.value })}
           style={{ font: "700 clamp(1.6rem,5vw,2.4rem)/1.1 var(--display)", border: "none", padding: 0, background: "transparent" }}
         />
-        {r.source &&
-          (/^https?:\/\//.test(r.source) ? (
-            <p className="muted">
-              From{" "}
-              <a href={r.source} target="_blank" rel="noreferrer">
-                {new URL(r.source).hostname.replace(/^www\./, "")}
-              </a>
-            </p>
-          ) : (
-            <p className="muted">From {r.source}</p>
-          ))}
+        {source}
       </div>
 
       {msg && <p className={`notice${msg.error ? " error" : ""}`} role="status">{msg.text}</p>}
 
-      <Photos
-        recipeId={r.id}
-        title={r.title}
-        images={r.images}
-        onChange={(images) => setR((cur) => (cur ? { ...cur, images } : cur))}
-      />
+      {photos}
 
       <div className="row">
         <label className="field">
@@ -113,18 +174,21 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
             <input
               type="number"
               step="any"
+              inputMode="decimal"
+              className="amt"
+              placeholder="amt"
               aria-label="Amount"
               value={ing.quantity ?? ""}
               onChange={(e) => setIng(i, { quantity: e.target.value ? Number(e.target.value) : null })}
             />
-            <input type="text" aria-label="Unit" placeholder="unit" value={ing.unit ?? ""} onChange={(e) => setIng(i, { unit: e.target.value || null })} />
-            <input type="text" aria-label="Ingredient" value={ing.name} onChange={(e) => setIng(i, { name: e.target.value })} />
-            <input type="text" aria-label="Note" className="note" placeholder="note" value={ing.note ?? ""} onChange={(e) => setIng(i, { note: e.target.value || null })} />
-            <select aria-label="Aisle" value={ing.category} onChange={(e) => setIng(i, { category: e.target.value as Category })}>
+            <input type="text" className="unit" aria-label="Unit" placeholder="unit" value={ing.unit ?? ""} onChange={(e) => setIng(i, { unit: e.target.value || null })} />
+            <input type="text" className="name" aria-label="Ingredient" placeholder="ingredient" value={ing.name} onChange={(e) => setIng(i, { name: e.target.value })} />
+            <input type="text" aria-label="Note" className="note" placeholder="note (optional)" value={ing.note ?? ""} onChange={(e) => setIng(i, { note: e.target.value || null })} />
+            <select className="aisle" aria-label="Aisle" value={ing.category} onChange={(e) => setIng(i, { category: e.target.value as Category })}>
               {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
             <button
-              className="icon-btn"
+              className="icon-btn x"
               aria-label={`Remove ${ing.name}`}
               onClick={() => setR({ ...r, ingredients: r.ingredients.filter((_, j) => j !== i) })}
             >
@@ -158,6 +222,7 @@ export default function RecipePage({ params }: { params: Promise<{ id: string }>
 
       <div className="row">
         <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+        <button className="btn" onClick={() => { setEditing(false); setMsg(null); fetch(`/api/recipes/${id}`).then(async (res) => res.ok && setR(await res.json())); }}>Cancel</button>
         <button className="btn btn-quiet" onClick={remove}>Delete recipe</button>
       </div>
     </div>
@@ -249,4 +314,10 @@ function Photos({
       {error && <p className="notice error" role="alert">{error}</p>}
     </section>
   );
+}
+
+/** "2 clove" → "2 cloves"; abbreviations (oz, lb, tbsp…) stay as they are. */
+function plural(unit: string, qty: number | null): string {
+  if (qty == null || qty <= 1.06 || /(s|oz|lb|tsp|tbsp|g|kg|ml|l|qt|pt)$/i.test(unit)) return unit;
+  return /(ch|sh|x)$/.test(unit) ? `${unit}es` : `${unit}s`;
 }

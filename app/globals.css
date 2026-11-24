@@ -129,11 +129,36 @@ textarea { resize: vertical; min-height: 80px; }
 .tag { font-size: 0.8rem; padding: 2px 8px; border-radius: 999px; background: var(--basil-soft); color: var(--basil); }
 
 /* ---------- recipe editor ---------- */
-.ing-row { display: grid; grid-template-columns: 72px 92px 1fr 36px; gap: 8px; align-items: center; }
-.ing-row .note { grid-column: 1 / -1; }
+/* Phones: ingredient name on top, amount / unit / aisle below, then the note. Wide screens: one line. */
+.ing-row {
+  display: grid; gap: 6px 8px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line);
+  grid-template-columns: 72px 84px minmax(0, 1fr) 36px;
+  grid-template-areas: "name name name x" "amt unit aisle aisle" "note note note note";
+}
+.ing-row:first-of-type { border-top: none; padding-top: 0; }
+.ing-row .amt { grid-area: amt; } .ing-row .unit { grid-area: unit; } .ing-row .name { grid-area: name; font-weight: 700; }
+.ing-row .note { grid-area: note; } .ing-row .aisle { grid-area: aisle; } .ing-row .x { grid-area: x; }
+.ing-row input, .ing-row select { min-height: 40px; padding: 8px 10px; }
+.ing-row .note { font-size: 0.92rem; }
 @media (min-width: 720px) {
-  .ing-row { grid-template-columns: 72px 92px 1.4fr 1fr 150px 36px; }
-  .ing-row .note { grid-column: auto; }
+  .ing-row {
+    grid-template-columns: 72px 84px minmax(0, 1.4fr) minmax(0, 1fr) 150px 36px;
+    grid-template-areas: "amt unit name note aisle x"; padding: 6px 0; border-top: none;
+  }
+  .ing-row .name { font-weight: 400; }
+}
+
+/* ---------- recipe view ---------- */
+.recipe-meta { color: var(--muted); font-weight: 700; }
+.ing-list { list-style: none; margin: 0; padding: 0; }
+.ing-list li { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.ing-list li:first-child { border-top: none; padding-top: 0; }
+.ing-amt { font-weight: 700; color: var(--basil); font-variant-numeric: tabular-nums; }
+.step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 16px; }
+.step-list li { counter-increment: step; display: grid; grid-template-columns: 32px 1fr; gap: 12px; line-height: 1.5; }
+.step-list li::before {
+  content: counter(step); width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--basil-soft); color: var(--basil); font-weight: 700; font-size: 0.9rem;
 }
 .icon-btn {
   border: none; background: transparent; color: var(--muted); font-size: 1.3rem; cursor: pointer;
